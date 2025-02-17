@@ -54,8 +54,6 @@ def generate_random_targets(num_targets):
 # Класс врага
 class Enemy:
     def __init__(self, targets):
-        self.x = 0  # Начинаем с левого края
-        self.y = HEIGHT  # Начинаем с нижнего края
         self.width = 20
         self.height = 20
         self.hp = 100  # Здоровье врага
@@ -63,6 +61,10 @@ class Enemy:
         self.current_target_index = 0  # Индекс текущей цели
         self.speed = ENEMY_SPEED  # Начальная скорость врага
         self.slowed_until = 0  # Время, до которого враг замедлен
+
+        # Начинаем с левого нижнего угла
+        self.x = 0  # Левый край
+        self.y = HEIGHT - self.height  # Нижний край (высота минус высота врага)
 
     def move(self, current_time, total_hp, enemies):
         # Определяем фактическую скорость врага
@@ -90,19 +92,18 @@ class Enemy:
                 self.y += dy * actual_speed
 
                 # Проверяем, достигли ли мы цели
-                distance_to_target = math.sqrt((target_x - self.x) ** 2 + (target_y - self.y) ** 2)
+                distance_to_target = math.sqrt((target_x - self.x) ** 2 +
+                                                (target_y - self.y) ** 2)
                 if distance_to_target < actual_speed:  # Используем actual_speed для проверки
-                    if target_x == WIDTH and target_y == 0:  # Если цель - верхний правый угол
-                        total_hp -= 100  # Уменьшаем общее здоровье
+                    self.current_target_index += 1  # Переходим к следующей цели
+                    if self.current_target_index >= len(self.targets):
+                        # Если враг достиг последней цели, возможно, он должен исчезнуть или выполнить другое действие
                         enemies.remove(self)  # Удаляем врага из списка
-                    else:
-                        self.current_target_index += 1
+
         return total_hp
 
     def draw(self, screen):
         screen.blit(enemy_image, (self.x, self.y))  # Используем текстуру врага
-
-
 
 # Класс пули
 class Bullet:
@@ -235,16 +236,6 @@ class Tower:
         return score
 
 
-def draw_lines(screen, targets):
-    # Рисуем линию от левого нижнего угла до первой точки
-    pygame.draw.line(screen, (0, 0, 255), (0, HEIGHT), targets[0], 10)  # Линия шириной 10 пикселей
-
-    # Рисуем линии между целевыми точками
-    for i in range(len(targets) - 1):
-        pygame.draw.line(screen, (0, 0, 255), targets[i], targets[i + 1], 10)
-    # Соединяем последнюю точку с верхним правым углом
-    pygame.draw.line(screen, (0, 0, 255), targets[-1], (WIDTH, 0), 10)
-
 def draw_hp(screen, total_hp, score):
     font = pygame.font.Font(None, 36)  # Шрифт для отображения текста
     text_hp = font.render(f'HP: {total_hp}', True, (0, 0, 0))  # Черный цвет текста
@@ -259,6 +250,19 @@ def draw_tower_costs(screen):
         text = font.render(f'Tower {tower_type}: {cost} points', True, (0, 0, 0))  # Черный цвет текста
         screen.blit(text, (10, y_offset))  # Отображаем текст
         y_offset += 40
+
+def draw_circles(screen, targets, circle_radius):
+    for target in targets:
+        pygame.draw.circle(screen, RED, target, int(circle_radius))
+
+    for i in range(len(targets) - 1):
+        start = targets[i]
+        end = targets[i + 1]
+        for j in range(1, 5):
+            # Находим координаты промежуточной точки
+            mid_x = int(start[0] + (end[0] - start[0]) * j / (5))
+            mid_y = int(start[1] + (end[1] - start[1]) * j / (5))
+            pygame.draw.circle(screen, RED, (mid_x, mid_y), int(circle_radius // 2))
 
 def main():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -275,6 +279,10 @@ def main():
     total_hp = 1000 # Общее здоровье
 
     score = 10  # Переменная для хранения очков
+
+    circle_radius = 10  # Начальный радиус кружков
+    growing = True  # Флаг для увеличения/уменьшения радиуса
+    circle_growth_rate = 0.5  # Скорость изменения радиуса
 
     running = True
     while running:
@@ -301,6 +309,15 @@ def main():
         # Логика игры
         if random.random() < 0.01:
             enemies.append(Enemy(targets))
+
+        if growing:
+            circle_radius += circle_growth_rate
+            if circle_radius >= 12:  # Максимальный радиус
+                growing = False
+        else:
+            circle_radius -= circle_growth_rate
+            if circle_radius <= 8:  # Минимальный радиус
+                growing = True
 
         current_time = pygame.time.get_ticks()
 
@@ -341,7 +358,7 @@ def main():
         for enemy in enemies:
             enemy.draw(screen)  # Рисуем врагов
 
-        draw_lines(screen, targets)  # Рисуем линии целей
+        draw_circles(screen, targets, circle_radius)
         draw_hp(screen, total_hp, score) # Отображаем текущее здоровье и очки
         draw_tower_costs(screen)
         pygame.display.flip()  # Обновляем экран
@@ -350,4 +367,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
