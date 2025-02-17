@@ -1,0 +1,353 @@
+import pygame
+import random
+import math
+
+# Инициализация Pygame
+pygame.init()
+
+# Константы
+WIDTH, HEIGHT = 800, 600
+FPS = 60
+ENEMY_SPEED = 1
+BULLET_SPEED = 1  # Скорость пули
+SCALE_FACTOR = 1.5
+TOWER_RANGE = 100  # Увеличенный радиус стрельбы башни
+TOWER_COSTS = {
+    1: 10,
+    2: 50,
+    3: 30,
+    4: 45,
+#    5: 10
+}
+
+# Цвета
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)  # Цвет круга атаки
+BULLET_COLOR = (255, 255, 0)  # Цвет пули
+BLUE = (0, 0, 255)
+
+# Загрузка изображений
+def load_image(filename):
+    image = pygame.image.load(filename)
+    image.set_colorkey(WHITE)  # Устанавливаем белый цвет как прозрачный
+    return pygame.transform.scale(image, (int(30 * SCALE_FACTOR), int(30 * SCALE_FACTOR)))
+
+enemy_image = load_image('enemy.png')
+background_image = pygame.transform.scale(pygame.image.load('background.png'), (WIDTH, HEIGHT))
+tower_images = [
+    load_image('tower1.png'),
+    load_image('tower2.png'),
+    load_image('tower3.png'),
+    load_image('tower4.png'),
+    load_image('tower5.png'),
+]
+
+# Функция для генерации случайных точек
+def generate_random_targets(num_targets):
+    targets = []
+    for _ in range(num_targets):
+        target_x = random.randint(0, WIDTH)
+        target_y = random.randint(0, HEIGHT)
+        targets.append((target_x, target_y))
+    return targets
+
+# Класс врага
+class Enemy:
+    def __init__(self, targets):
+        self.x = 0  # Начинаем с левого края
+        self.y = HEIGHT  # Начинаем с нижнего края
+        self.width = 20
+        self.height = 20
+        self.hp = 100  # Здоровье врага
+        self.targets = targets  # Используем одинаковые цели для всех врагов
+        self.current_target_index = 0  # Индекс текущей цели
+        self.speed = ENEMY_SPEED  # Начальная скорость врага
+        self.slowed_until = 0  # Время, до которого враг замедлен
+
+    def move(self, current_time, total_hp, enemies):
+        # Определяем фактическую скорость врага
+        if current_time < self.slowed_until:
+            actual_speed = self.speed / 2  # Замедляем врага
+        else:
+            actual_speed = self.speed
+
+        # Проверяем, есть ли еще цели для врага
+        if self.current_target_index < len(self.targets):
+            target_x, target_y = self.targets[self.current_target_index]
+
+            # Вычисляем направление движения
+            dx = target_x - self.x
+            dy = target_y - self.y
+
+            # Нормализуем вектор направления
+            distance = math.sqrt(dx ** 2 + dy ** 2)
+            if distance != 0:
+                dx /= distance
+                dy /= distance
+
+                # Двигаем врага
+                self.x += dx * actual_speed
+                self.y += dy * actual_speed
+
+                # Проверяем, достигли ли мы цели
+                distance_to_target = math.sqrt((target_x - self.x) ** 2 + (target_y - self.y) ** 2)
+                if distance_to_target < actual_speed:  # Используем actual_speed для проверки
+                    if target_x == WIDTH and target_y == 0:  # Если цель - верхний правый угол
+                        total_hp -= 100  # Уменьшаем общее здоровье
+                        enemies.remove(self)  # Удаляем врага из списка
+                    else:
+                        self.current_target_index += 1
+        return total_hp
+
+    def draw(self, screen):
+        screen.blit(enemy_image, (self.x, self.y))  # Используем текстуру врага
+
+
+
+# Класс пули
+class Bullet:
+    def __init__(self, start_x, start_y, target_x, target_y):
+        self.x = start_x
+        self.y = start_y
+        self.target_x = target_x
+        self.target_y = target_y
+        self.speed = 10  # Скорость пули
+        self.angle = math.atan2(target_y - start_y, target_x - start_x)  # Угол к цели
+        self.radius = 5  # Радиус пули по умолчанию, будет изменен в классе Tower
+
+    def move(self):
+        # Двигаем пулю в направлении цели
+        self.x += self.speed * math.cos(self.angle)
+        self.y += self.speed * math.sin(self.angle)
+
+    def draw(self, screen):
+        # Рисуем пулю как круг
+        pygame.draw.circle(screen, BULLET_COLOR, (int(self.x), int(self.y)), self.radius)
+
+
+class Tower:
+    def __init__(self, x, y, tower_type):
+        self.x = x
+        self.y = y
+        self.tower_type = tower_type
+        self.bullets = []
+        self.last_shot_time = 0
+
+        # Установите ширину и высоту башни
+        self.width = tower_images[tower_type - 1].get_width()  # Получаем ширину изображения башни
+        self.height = tower_images[tower_type - 1].get_height()  # Получаем высоту изображения башни
+
+        # Настройки для разных типов башен
+        if self.tower_type == 1:
+            self.reload_time = 2000  # 2 секунды
+            self.range = 100  # Радиус стрельбы
+            self.bullet_radius = 5  # Радиус пули
+        elif self.tower_type == 2:
+            self.reload_time = 6000  # 6 секунд
+            self.range = 200  # Радиус стрельбы
+            self.bullet_radius = 10  # Радиус пули
+        elif self.tower_type == 3:
+            self.reload_time = 3000  # 3 секунды
+            self.range = 45  # Радиус стрельбы
+            self.bullet_radius = 5  # Радиус пули
+            self.bullet_count = 6  # Количество пуль за один выстрел
+        elif self.tower_type == 4:
+            self.reload_time = 4000  # 4 секунды
+            self.range = TOWER_RANGE  # Радиус стрельбы
+            self.bullet_radius = 5  # Радиус пули (можно оставить, если нужно)
+        elif self.tower_type == 5:
+            self.reload_time = 2000  # 2 секунды
+            self.range = TOWER_RANGE  # Радиус стрельбы
+            self.bullet_radius = 5  # Радиус пули
+
+    def draw(self, screen):
+        screen.blit(tower_images[self.tower_type - 1], (self.x, self.y))  # Используем текстуру башни
+        pygame.draw.circle(screen, RED, (self.x + self.width // 2, self.y + self.height // 2), self.range, 1)
+
+    def shoot(self, enemies, current_time, score):
+        if current_time - self.last_shot_time >= self.reload_time:  # Проверяем время перезарядки
+            for enemy in enemies:
+                distance = math.sqrt((self.x - enemy.x) ** 2 + (self.y - enemy.y) ** 2)
+                if distance <= self.range:  # Если враг в радиусе стрельбы
+                    if self.tower_type == 1:  # Башня 1
+                        bullet = Bullet(self.x + self.width // 2, self.y + self.height // 2,
+                                        enemy.x + enemy.width // 2, enemy.y + enemy.height // 2)
+                        bullet.radius = self.bullet_radius  # Устанавливаем радиус пули
+                        self.bullets.append(bullet)  # Добавляем пулю в список
+                        enemy.hp -= 100  # Уменьшаем здоровье врага
+                        self.last_shot_time = current_time  # Обновляем время последнего выстрела
+
+                        if enemy.hp <= 0:
+                            enemies.remove(enemy)  # Удаляем врага, если здоровье = 0
+                            score += 1  # Увеличиваем очки за убитого врага
+                        break  # Стреляем только в одного врага за раз
+
+                    elif self.tower_type == 2:  # Башня 2
+                        bullet = Bullet(self.x + self.width // 2, self.y + self.height // 2,
+                                        enemy.x + enemy.width // 2, enemy.y + enemy.height // 2)
+                        bullet.radius = self.bullet_radius  # Устанавливаем радиус пули
+                        self.bullets.append(bullet)  # Добавляем пулю в список
+                        enemy.hp -= 100  # Уменьшаем здоровье врага
+                        self.last_shot_time = current_time  # Обновляем время последнего выстрела
+                        if enemy.hp <= 0:
+                            enemies.remove(enemy)  # Удаляем врага, если здоровье = 0
+                            score += 1  # Увеличиваем очки за убитого врага
+                        break  # Стреляем только в одного врага за раз
+
+                    elif self.tower_type == 3:  # Башня 3
+                        for i in range(self.bullet_count):  # Стреляем 6 пулями
+                            angle_offset = (i - self.bullet_count // 2) * (math.pi / 6)  # Угол для каждой пули
+                            bullet = Bullet(self.x + self.width // 2, self.y + self.height // 2,
+                                            enemy.x + enemy.width // 2 + math.cos(angle_offset) * 20,
+                                            enemy.y + enemy.height // 2 + math.sin(angle_offset) * 20)
+                            bullet.radius = self.bullet_radius  # Устанавливаем радиус пули
+                            self.bullets.append(bullet)  # Добавляем пулю в список
+                        enemy.hp -= 100  # Уменьшаем здоровье врага
+                        self.last_shot_time = current_time  # Обновляем время последнего выстрела
+
+                        if enemy.hp <= 0:
+                            enemies.remove(enemy)  # Удаляем врага, если здоровье = 0
+                            score += 1
+                        break  # Стреляем только в одного врага за раз
+
+                    elif self.tower_type == 4:  # Башня 4
+                        bullet = Bullet(self.x + self.width // 2, self.y + self.height // 2,
+                                        enemy.x + enemy.width // 2, enemy.y + enemy.height // 2)
+                        bullet.radius = self.bullet_radius  # Устанавливаем радиус пули
+                        bullet.color = BLUE  # Устанавливаем цвет пули
+                        self.bullets.append(bullet)  # Добавляем пулю в список
+                        enemy.slowed_until = current_time + 4000  # Замедляем врага на 4 секунды
+                        self.last_shot_time = current_time  # Обновляем время последнего выстрела
+                        break  # Стреляем только в одного врага за раз
+
+#                    elif self.tower_type == 5:  # Логика для башни 5
+#                        bullet = Bullet(self.x + self.width // 2, self.y + self.height // 2,
+#                                       enemy.x + enemy.width // 2, enemy.y + enemy.height // 2)
+#                        bullet.radius = self.bullet_radius  # Устанавливаем радиус пули
+#                        self.bullets.append(bullet)  # Добавляем пулю в список
+#                        enemy.hp -= 100  # Уменьшаем здоровье врага
+#                        self.last_shot_time = current_time  # Обновляем время последнего выстрела
+#
+#                       if enemy.hp <= 0:
+#                            enemies.remove(enemy)  # Удаляем врага, если здоровье = 0
+#                           score += 1
+#                        break  # Стреляем только в одного врага за раз
+        return score
+
+
+def draw_lines(screen, targets):
+    # Рисуем линию от левого нижнего угла до первой точки
+    pygame.draw.line(screen, (0, 0, 255), (0, HEIGHT), targets[0], 10)  # Линия шириной 10 пикселей
+
+    # Рисуем линии между целевыми точками
+    for i in range(len(targets) - 1):
+        pygame.draw.line(screen, (0, 0, 255), targets[i], targets[i + 1], 10)
+    # Соединяем последнюю точку с верхним правым углом
+    pygame.draw.line(screen, (0, 0, 255), targets[-1], (WIDTH, 0), 10)
+
+def draw_hp(screen, total_hp, score):
+    font = pygame.font.Font(None, 36)  # Шрифт для отображения текста
+    text_hp = font.render(f'HP: {total_hp}', True, (0, 0, 0))  # Черный цвет текста
+    text_score = font.render(f'Score: {score}', True, (0, 0, 0))  # Черный цвет текста
+    screen.blit(text_hp, (10, 10))  # Отображаем текст HP в верхнем левом углу
+    screen.blit(text_score, (10, 50))
+
+def draw_tower_costs(screen):
+    font = pygame.font.Font(None, 36)  # Шрифт для отображения текста
+    y_offset = 100  # Начальная позиция по вертикали
+    for tower_type, cost in TOWER_COSTS.items():
+        text = font.render(f'Tower {tower_type}: {cost} points', True, (0, 0, 0))  # Черный цвет текста
+        screen.blit(text, (10, y_offset))  # Отображаем текст
+        y_offset += 40
+
+def main():
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Tower Defense")
+    clock = pygame.time.Clock()
+
+    # Генерация одинаковых случайных точек для всех врагов
+    targets = generate_random_targets(3)
+    targets.append((WIDTH, 0))  # Добавляем верхний правый угол как последнюю цель
+
+    enemies = []
+    towers = []  # Список для хранения башен
+
+    total_hp = 1000 # Общее здоровье
+
+    score = 10  # Переменная для хранения очков
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            # Обработка нажатий клавиш 1-5 для размещения башен
+            if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4): #, pygame.K_5
+                    tower_type = event.key - pygame.K_1 + 1
+                    if score >= TOWER_COSTS[tower_type]:  # Проверяем, достаточно ли очков
+                        score -= TOWER_COSTS[tower_type]  # Уменьшаем очки на стоимость башни
+                        mouse_x, mouse_y = pygame.mouse.get_pos()
+                        towers.append(Tower(mouse_x, mouse_y, tower_type))
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                for tower in towers[:]:
+                    if (tower.x <= mouse_x <= tower.x + tower.width) and (tower.y <= mouse_y <= tower.y + tower.height):
+                        towers.remove(tower)
+                        break
+
+        # Логика игры
+        if random.random() < 0.01:
+            enemies.append(Enemy(targets))
+
+        current_time = pygame.time.get_ticks()
+
+        # Двигаем врагов
+        for enemy in enemies:
+            total_hp = enemy.move(current_time, total_hp, enemies)
+
+        if total_hp <= 0:
+            running = False
+
+        # Стрельба башнями
+        for tower in towers:
+            score = tower.shoot(enemies, current_time, score)
+
+        # Обновляем и отрисовываем пули
+        for tower in towers:
+            for bullet in tower.bullets[:]:  # Итерируем по копии списка
+                bullet.move()
+                if bullet.x < 0 or bullet.x > WIDTH or bullet.y < 0 or bullet.y > HEIGHT:
+                    tower.bullets.remove(bullet)
+                    # Проверка столкновения пуль с врагами
+                    for enemy in enemies[:]:  # Итерируем по копии списка врагов
+                        distance = math.sqrt((bullet.x - enemy.x) ** 2 + (bullet.y - enemy.y) ** 2)
+                        if distance < bullet.radius + enemy.width / 2:  # Проверяем столкновение
+                            if tower.tower_type != 4:  # Если башня не 4, удаляем врага
+                                enemies.remove(enemy)  # Удаляем врага
+                            tower.bullets.remove(bullet)  # Удаляем пулю
+                            break  # Прерываем цикл, так как пуля уже попала в врага
+
+        # Отрисовка всех объектов на экране
+        screen.fill(WHITE)  # Очистка экрана
+        screen.blit(background_image, (0, 0))  # Отрисовка фона
+
+        for tower in towers:
+            tower.draw(screen)  # Рисуем башни
+        for bullet in [b for tower in towers for b in tower.bullets]:  # Рисуем все пули
+            bullet.draw(screen)
+        for enemy in enemies:
+            enemy.draw(screen)  # Рисуем врагов
+
+        draw_lines(screen, targets)  # Рисуем линии целей
+        draw_hp(screen, total_hp, score) # Отображаем текущее здоровье и очки
+        draw_tower_costs(screen)
+        pygame.display.flip()  # Обновляем экран
+        clock.tick(FPS)  # Ограничиваем FPS
+    pygame.quit()  # Выход из игры
+
+if __name__ == "__main__":
+    main()
+
