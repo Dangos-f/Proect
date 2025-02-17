@@ -78,8 +78,8 @@ class Enemy:
             target_x, target_y = self.targets[self.current_target_index]
 
             # Вычисляем направление движения
-            dx = target_x - self.x
-            dy = target_y - self.y
+            dx = target_x - (self.x + self.width // 2)  # Используем центр врага
+            dy = target_y - (self.y + self.height // 2)  # Используем центр врага
 
             # Нормализуем вектор направления
             distance = math.sqrt(dx ** 2 + dy ** 2)
@@ -92,18 +92,20 @@ class Enemy:
                 self.y += dy * actual_speed
 
                 # Проверяем, достигли ли мы цели
-                distance_to_target = math.sqrt((target_x - self.x) ** 2 +
-                                                (target_y - self.y) ** 2)
+                distance_to_target = math.sqrt((target_x - (self.x + self.width // 2)) ** 2 +
+                                                (target_y - (self.y + self.height // 2)) ** 2)
                 if distance_to_target < actual_speed:  # Используем actual_speed для проверки
-                    self.current_target_index += 1  # Переходим к следующей цели
-                    if self.current_target_index >= len(self.targets):
-                        # Если враг достиг последней цели, возможно, он должен исчезнуть или выполнить другое действие
+                    if target_x == WIDTH and target_y == 0:  # Если цель - верхний правый угол
+                        total_hp -= 100  # Уменьшаем общее здоровье
                         enemies.remove(self)  # Удаляем врага из списка
-
+                    else:
+                        self.current_target_index += 1
         return total_hp
 
     def draw(self, screen):
-        screen.blit(enemy_image, (self.x, self.y))  # Используем текстуру врага
+        # Рисуем врага, сдвигая на половину ширины и высоты
+        screen.blit(enemy_image, (self.x - self.width / 2, self.y - self.height / 2))  # Используем текстуру врага
+
 
 # Класс пули
 class Bullet:
