@@ -106,7 +106,6 @@ class Enemy:
         # Рисуем врага, сдвигая на половину ширины и высоты
         screen.blit(enemy_image, (self.x - self.width / 2, self.y - self.height / 2))  # Используем текстуру врага
 
-
 # Класс пули
 class Bullet:
     def __init__(self, start_x, start_y, target_x, target_y):
@@ -286,8 +285,16 @@ def main():
     growing = True  # Флаг для увеличения/уменьшения радиуса
     circle_growth_rate = 0.5  # Скорость изменения радиуса
 
+    wave_time = 60000  # 60 секунд для первой волны
+    enemies_per_wave = 20  # Количество врагов в первой волне
+    wave_count = 0  # Счетчик волн
+
+    last_spawn_time = 0  # Время последнего спавна врага
+    spawn_interval = wave_time / enemies_per_wave  # Интервал спавна врагов
+
     running = True
     while running:
+        current_time = pygame.time.get_ticks() # Обновляем текущее время в начале цикла
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -309,8 +316,16 @@ def main():
                         break
 
         # Логика игры
-        if random.random() < 0.01:
+        if current_time // wave_time > wave_count:
+            wave_count += 1
+            enemies_per_wave += 1  # Увеличиваем количество врагов на 1 в каждой волне
+            spawn_interval = wave_time / enemies_per_wave  # Обновляем интервал спавна
+
+        # Спавним врагов с равными промежутками
+        if current_time - last_spawn_time >= spawn_interval and len(enemies) < enemies_per_wave:
             enemies.append(Enemy(targets))
+            last_spawn_time = current_time  # Обновляем время последнего спавна
+
 
         if growing:
             circle_radius += circle_growth_rate
@@ -369,3 +384,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
