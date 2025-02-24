@@ -265,11 +265,66 @@ def draw_circles(screen, targets, circle_radius):
             mid_y = int(start[1] + (end[1] - start[1]) * j / (5))
             pygame.draw.circle(screen, RED, (mid_x, mid_y), int(circle_radius // 2))
 
+
+def show_rules():
+    rules_window = pygame.display.set_mode((400, 300))
+    pygame.display.set_caption("Правила игры")
+    font = pygame.font.Font(None, 24)
+
+    rules_text = [
+        "Правила игры:",
+        "1. Размещайте башни, чтобы остановить врагов.",
+        "2. Каждый тип башни имеет свои особенности.",
+        "3. Стреляйте в врагов, чтобы заработать очки.",
+        "4. Если здоровье упадет до 0, игра закончится.",
+        "Нажмите любую клавишу, чтобы начать игру."
+    ]
+
+    running = True
+    while running:
+        rules_window.fill(WHITE)
+        for i, line in enumerate(rules_text):
+            text = font.render(line, True, (0, 0, 0))
+            rules_window.blit(text, (20, 20 + i * 30))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+            if event.type == pygame.KEYDOWN:
+                running = False
+
+        pygame.display.flip()
+
+def show_game_over():
+    game_over_window = pygame.display.set_mode((400, 300))
+    pygame.display.set_caption("Game Over")
+    font = pygame.font.Font(None, 36)
+
+    game_over_text = font.render("Game Over", True, (255, 0, 0))  # Красный цвет текста
+    restart_text = font.render("Нажмите любую клавишу, чтобы начать заново.", True, (0, 0, 0))
+
+    running = True
+    while running:
+        game_over_window.fill(WHITE)
+        game_over_window.blit(game_over_text, (130, 100))  # Центрируем текст
+        game_over_window.blit(restart_text, (30, 150))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+            if event.type == pygame.KEYDOWN:
+                running = False
+
+        pygame.display.flip()
+
+
 def main():
+    show_rules()  # Отображаем окно с правилами перед началом игры
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Tower Defense")
     clock = pygame.time.Clock()
-
     # Генерация одинаковых случайных точек для всех врагов
     targets = generate_random_targets(3)
     targets.append((WIDTH, 0))  # Добавляем верхний правый угол как последнюю цель
@@ -343,6 +398,7 @@ def main():
             total_hp = enemy.move(current_time, total_hp, enemies)
 
         if total_hp <= 0:
+            show_game_over()
             running = False
 
         # Стрельба башнями
@@ -384,4 +440,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
