@@ -33,14 +33,14 @@ def load_image(filename):
     image.set_colorkey(WHITE)  # Устанавливаем белый цвет как прозрачный
     return pygame.transform.scale(image, (int(30 * SCALE_FACTOR), int(30 * SCALE_FACTOR)))
 
-enemy_image = load_image('enemy.png')
-background_image = pygame.transform.scale(pygame.image.load('background.png'), (WIDTH, HEIGHT))
+enemy_image = load_image('sprites/enemy.png')
+background_image = pygame.transform.scale(pygame.image.load('sprites/background.png'), (WIDTH, HEIGHT))
 tower_images = [
-    load_image('tower1.png'),
-    load_image('tower2.png'),
-    load_image('tower3.png'),
-    load_image('tower4.png'),
-    load_image('tower5.png'),
+    load_image('sprites/tower1.png'),
+    load_image('sprites/tower2.png'),
+    load_image('sprites/tower3.png'),
+    load_image('sprites/tower4.png'),
+    load_image('sprites/tower5.png'),
 ]
 
 # Функция для генерации случайных точек
