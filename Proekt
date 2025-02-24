@@ -1,6 +1,7 @@
 import pygame
 import random
 import math
+import sqlite3
 
 # Инициализация Pygame
 pygame.init()
@@ -296,19 +297,22 @@ def show_rules():
 
         pygame.display.flip()
 
-def show_game_over():
+def show_game_over(elapsed_time):
+    save_attempt(elapsed_time)  # Сохраняем время выживания в базу данных
     game_over_window = pygame.display.set_mode((400, 300))
     pygame.display.set_caption("Game Over")
     font = pygame.font.Font(None, 36)
 
     game_over_text = font.render("Game Over", True, (255, 0, 0))  # Красный цвет текста
     restart_text = font.render("Нажмите любую клавишу, чтобы начать заново.", True, (0, 0, 0))
+    timer_text = font.render(f"Выжили: {elapsed_time} секунд", True, (0, 0, 0))  # Отображение времени выживания
 
     running = True
     while running:
         game_over_window.fill(WHITE)
         game_over_window.blit(game_over_text, (130, 100))  # Центрируем текст
         game_over_window.blit(restart_text, (30, 150))
+        game_over_window.blit(timer_text, (130, 200))  # Отображаем таймер
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -319,8 +323,29 @@ def show_game_over():
 
         pygame.display.flip()
 
+def init_db():
+    conn = sqlite3.connect('game_data.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            survival_time INTEGER
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def save_attempt(survival_time):
+    conn = sqlite3.connect('game_data.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO attempts (survival_time) VALUES (?)', (survival_time,))
+    conn.commit()
+    conn.close()
+
+
 
 def main():
+    init_db()  # Инициализация базы данных
     show_rules()  # Отображаем окно с правилами перед началом игры
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Tower Defense")
@@ -344,6 +369,7 @@ def main():
     enemies_per_wave = 20  # Количество врагов в первой волне
     wave_count = 0  # Счетчик волн
 
+    start_time = pygame.time.get_ticks()  # Запоминаем время начала игры
     last_spawn_time = 0  # Время последнего спавна врага
     spawn_interval = wave_time / enemies_per_wave  # Интервал спавна врагов
 
@@ -398,7 +424,8 @@ def main():
             total_hp = enemy.move(current_time, total_hp, enemies)
 
         if total_hp <= 0:
-            show_game_over()
+            elapsed_time = (current_time - start_time) // 1000  # Подсчет времени в секундах
+            show_game_over(elapsed_time)
             running = False
 
         # Стрельба башнями
