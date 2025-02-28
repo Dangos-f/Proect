@@ -18,7 +18,6 @@ TOWER_COSTS = {
     2: 50,
     3: 30,
     4: 45,
-#    5: 10
 }
 
 # Цвета
@@ -222,19 +221,6 @@ class Tower:
                         enemy.slowed_until = current_time + 4000  # Замедляем врага на 4 секунды
                         self.last_shot_time = current_time  # Обновляем время последнего выстрела
                         break  # Стреляем только в одного врага за раз
-
-#                    elif self.tower_type == 5:  # Логика для башни 5
-#                        bullet = Bullet(self.x + self.width // 2, self.y + self.height // 2,
-#                                       enemy.x + enemy.width // 2, enemy.y + enemy.height // 2)
-#                        bullet.radius = self.bullet_radius  # Устанавливаем радиус пули
-#                        self.bullets.append(bullet)  # Добавляем пулю в список
-#                        enemy.hp -= 100  # Уменьшаем здоровье врага
-#                        self.last_shot_time = current_time  # Обновляем время последнего выстрела
-#
-#                       if enemy.hp <= 0:
-#                            enemies.remove(enemy)  # Удаляем врага, если здоровье = 0
-#                           score += 1
-#                        break  # Стреляем только в одного врага за раз
         return score
 
 
